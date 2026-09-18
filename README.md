@@ -88,6 +88,40 @@ graph TD
 
 ---
 
+## 5. Testing & Verification Suite
+
+A complete verification suite is provided under [`tests/`](file:///d:/stealth_mouse/tests) to mathematically and functionally prove anti-bot evasion properties:
+
+```bash
+# Run full automated test suite (12 tests)
+pytest -v tests
+
+# Or run specific test modules directly:
+python tests/test_core.py                 # KDTree, Conformal Transforms, Splines, Path generation
+python tests/test_kinematics.py           # Asymmetric velocity bell curves, micro-tremors vs Bézier
+python tests/test_browser.py              # Headless Playwright integration & isTrusted: true checks
+python tests/test_interactive_browser.py  # Visible browser UI: Sandbox & Cloudflare Turnstile
+```
+
+* **`tests/test_interactive_browser.py`:** Opens a **visible Chromium window (`headless=False`)** to directly watch cursor trajectories in real time:
+  * Run `--sandbox` for the live Biometric Telemetry Dashboard (displays canvas trail, speed, jitter, and real-time Anti-Bot classification).
+  * Run `--turnstile` for a live test on a real **Cloudflare Turnstile** challenge page.
+* **`tests/test_core.py`:** Tests KDTree sub-millisecond querying, conformal boundary preservation, and hybrid temporal blending.
+* **`tests/test_kinematics.py`:** Benchmarks `stealth_mouse` against naive synthetic Bézier curves, verifying biological acceleration/deceleration phases and hardware polling jitter ($\Delta t$). Also saves a visual diagnostic plot to `tests/kinematics_comparison.png`.
+* **`tests/test_browser.py`:** Launches headless Chromium via Playwright, listens to DOM JavaScript events, and verifies `event.isTrusted === true`, discrete trajectory events, and realistic human dwell time (45–130 ms).
+
+### Biometric Validation (Synthetic Bézier vs. Stealth Mouse):
+
+<p align="center">
+  <img src="tests/kinematics_comparison.png" alt="Kinematic Comparison: Synthetic Bézier vs Stealth Mouse" width="100%">
+</p>
+
+* **Velocity Profile $v(t)$:** Bézier curves are unnaturally symmetric, whereas Stealth Mouse exhibits human-like rapid acceleration followed by a prolonged deceleration phase with terminal micro-corrections.
+* **Sampling Interval $\Delta t$:** Naive scrapers use fixed delays (zero variance), while Stealth Mouse models authentic hardware polling jitter (60–120 Hz / 8–16 ms).
+* **Kinematic Phase Plane:** Anti-bot ML classifiers detect the rigid geometric regularity of Bézier math on $(dx, dy)$ scatter plots, whereas real human tremor displays physiological dispersion.
+
+---
+
 ## Installation
 
 ```bash
