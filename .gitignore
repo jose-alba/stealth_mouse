@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Virtual Environments
+venv/
+.venv/
+ENV/
+env/
+
+# Animation & generator utilities
+animation.html
+generate_gif.py
