@@ -78,6 +78,7 @@ class MouseRecorder:
         self._keyboard_listener: Optional[keyboard.Listener] = None
         self._is_recording: bool = False
         self._is_paused: bool = False
+        self._pressed_keys: set = set()
 
         # Live stats
         self.total_events_captured: int = 0
@@ -178,16 +179,38 @@ class MouseRecorder:
             self._current_points.append((float(x), float(y), now))
             self._last_event_time = now
 
+    def _normalize_key(self, key: Any) -> Optional[str]:
+        """Maps a pynput key to a normalized identifier ('ctrl', 'c', 'p') for combination tracking."""
+        if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r) or getattr(key, "name", "") in ("ctrl", "ctrl_l", "ctrl_r"):
+            return "ctrl"
+        vk = getattr(key, "vk", None)
+        char = getattr(key, "char", None)
+        if vk in (17, 162, 163):
+            return "ctrl"
+        if vk == ord("C") or char in ("c", "C", "\x03"):
+            return "c"
+        if vk == ord("P") or char in ("p", "P", "\x10"):
+            return "p"
+        return None
+
     def _on_key_press(self, key: Any) -> None:
-        """Callback for keyboard events to toggle pause or finish."""
+        """Callback for keyboard events. Stops ONLY when Ctrl + C + P are pressed simultaneously."""
         try:
-            if key == keyboard.Key.esc or (hasattr(key, "char") and key.char == "q"):
-                print("\n[Stop signal received from keyboard]")
-                self.stop()
-            elif hasattr(key, "char") and key.char == "p":
-                self._is_paused = not self._is_paused
-                state = "PAUSED" if self._is_paused else "RESUMED"
-                print(f"\n[Recording {state}]")
+            k_id = self._normalize_key(key)
+            if k_id:
+                self._pressed_keys.add(k_id)
+                if {"ctrl", "c", "p"}.issubset(self._pressed_keys):
+                    print("\n[Stop signal received: Ctrl+C+P]")
+                    self.stop()
+        except Exception:
+            pass
+
+    def _on_key_release(self, key: Any) -> None:
+        """Callback for keyboard release events to accurately maintain pressed keys state."""
+        try:
+            k_id = self._normalize_key(key)
+            if k_id:
+                self._pressed_keys.discard(k_id)
         except Exception:
             pass
 
@@ -200,6 +223,7 @@ class MouseRecorder:
         """
         self._is_recording = True
         self._is_paused = False
+        self._pressed_keys.clear()
         self._current_points.clear()
         self.start_wall_time = time.time()
         self._last_event_time = time.perf_counter()
@@ -210,18 +234,22 @@ class MouseRecorder:
         )
         self._keyboard_listener = keyboard.Listener(
             on_press=self._on_key_press,
+            on_release=self._on_key_release,
         )
 
         self._mouse_listener.start()
         self._keyboard_listener.start()
 
         if not non_blocking:
-            try:
-                while self._is_recording:
+            while self._is_recording:
+                try:
                     time.sleep(0.1)
-            except KeyboardInterrupt:
-                print("\n[Stop signal received: Ctrl+C]")
-                self.stop()
+                except KeyboardInterrupt:
+                    # Ignore standalone Ctrl+C in terminal unless P is also held down
+                    if {"ctrl", "c", "p"}.issubset(self._pressed_keys):
+                        print("\n[Stop signal received: Ctrl+C+P]")
+                        self.stop()
+                        break
 
     def stop(self) -> None:
         """Stops the recorder and tears down hooks."""
@@ -229,6 +257,7 @@ class MouseRecorder:
             return
 
         self._is_recording = False
+        self._pressed_keys.clear()
 
         # Finalize any pending points
         self._finalize_current_stroke(is_click=False)
@@ -364,8 +393,7 @@ def main() -> None:
     print("-" * 65)
     print("  INSTRUCTIONS:")
     print("  * Use your mouse naturally (browse, click, navigate, etc.)")
-    print("  * Press 'p' to pause / resume")
-    print("  * Press 'Esc', 'q', or Ctrl+C to stop and save")
+    print("  * Press Ctrl + C + P simultaneously to stop and save")
     print("=" * 65)
     print("Starting capture... Move your mouse and click naturally:\n")
 

@@ -47,6 +47,7 @@ HTML_TEST_PAGE = """
   <script>
     window.__mouse_events = {
       moves: [],
+      wheels: [],
       mousedown: null,
       mouseup: null,
       click: null
@@ -56,6 +57,14 @@ HTML_TEST_PAGE = """
       window.__mouse_events.moves.push({
         x: e.clientX,
         y: e.clientY,
+        t: performance.now(),
+        isTrusted: e.isTrusted
+      });
+    });
+
+    window.addEventListener('wheel', (e) => {
+      window.__mouse_events.wheels.push({
+        deltaY: e.deltaY,
         t: performance.now(),
         isTrusted: e.isTrusted
       });
@@ -152,6 +161,78 @@ class TestBrowserIntegration(unittest.IsolatedAsyncioTestCase):
         click_ev = events["click"]
         self.assertAlmostEqual(click_ev["x"], target_x, delta=3.0)
         self.assertAlmostEqual(click_ev["y"], target_y, delta=3.0)
+
+    async def test_playwright_stealth_scroll(self):
+        """
+        Dispatches biological scroll down 500px and verifies browser wheel events.
+        """
+        player = StealthMousePlayer(page=self.page, data_dir="data", top_k=10)
+        target_dy = 500.0
+
+        await player.async_scroll(target_dy)
+
+        events = await self.page.evaluate("() => window.__mouse_events")
+        wheels = events["wheels"]
+
+        self.assertGreater(len(wheels), 5, "Browser should record multiple discrete wheel events")
+        for w in wheels:
+            self.assertTrue(w["isTrusted"], "Wheel events must have isTrusted: true")
+
+        net_wheel_dy = sum(w["deltaY"] for w in wheels)
+        self.assertAlmostEqual(net_wheel_dy, target_dy, delta=5.0)
+
+    async def test_playwright_stealth_drag(self):
+        """
+        Dispatches biological drag-and-drop from (200, 200) to (600, 350) and verifies browser events.
+        """
+        player = StealthMousePlayer(page=self.page, data_dir="data", top_k=10)
+        start_x, start_y = 200.0, 200.0
+        target_x, target_y = 600.0, 350.0
+
+        await player.async_drag(target_x, target_y, start_x=start_x, start_y=start_y)
+
+        events = await self.page.evaluate("() => window.__mouse_events")
+        moves = events["moves"]
+
+        self.assertGreater(len(moves), 5, "Browser should record discrete move events during drag")
+        for m in moves:
+            self.assertTrue(m["isTrusted"], "Drag move events must be trusted (isTrusted: true)")
+
+        # Verify final location matches target
+        last_move = moves[-1]
+        self.assertAlmostEqual(last_move["x"], target_x, delta=3.0)
+        self.assertAlmostEqual(last_move["y"], target_y, delta=3.0)
+
+    async def test_playwright_recaptcha_v3_score(self):
+        """
+        Navigates to Google's official reCAPTCHA v3 demo, interacts with human kinematics,
+        and verifies that Google's biometric model classifies the interaction with high score (>= 0.7).
+        """
+        import json
+        recaptcha_page = await self.context.new_page()
+        try:
+            player = StealthMousePlayer(page=recaptcha_page, data_dir="data", top_k=10)
+            await recaptcha_page.goto(
+                "https://recaptcha-demo.appspot.com/recaptcha-v3-request-scores.php",
+                wait_until="networkidle",
+                timeout=20000,
+            )
+
+            # Human interaction sequence: move, scroll, move again
+            await player.async_move_to(400.0, 250.0, start_x=120.0, start_y=120.0)
+            await player.async_scroll(200.0)
+            await player.async_move_to(550.0, 380.0)
+
+            # Wait for response JSON to populate
+            await recaptcha_page.wait_for_selector(".response:not(:empty)", timeout=15000)
+            text = await recaptcha_page.inner_text(".response")
+            data = json.loads(text)
+
+            self.assertTrue(data.get("success"), f"reCAPTCHA v3 failed: {data}")
+            score = float(data.get("score", 0.0))
+            self.assertGreaterEqual(score, 0.7, f"reCAPTCHA v3 score too low: {score}")
+        finally:
+            await recaptcha_page.close()
 
 
 if __name__ == "__main__":

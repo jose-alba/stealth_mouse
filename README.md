@@ -18,8 +18,7 @@ Record your own daily mouse movements to populate or expand your database:
 python -m src.recorder
 ```
 
-* **Pause / Resume:** Press `p`.
-* **Save & Exit:** Press `Esc`, `q`, or `Ctrl+C`.
+* **Save & Exit:** Press `Ctrl` + `C` + `P` simultaneously.
 
 Strokes are automatically segmented click-to-click, idle dead pauses are discarded, and data is accumulated into two complementary files in `data/`:
 1. `data/trajectories_index.npz`: 3D descriptors `[log(d), cos(θ), sin(θ)]` and offsets for the KDTree.
@@ -27,18 +26,27 @@ Strokes are automatically segmented click-to-click, idle dead pauses are discard
 
 ---
 
-## 2. Playback Movements (Super-Minimalist API)
+## 2. Minimalist Public API (`move`, `click`, `scroll`, `drag`)
 
-### Python API (4 to 5 letters + coordinates):
+### Python API:
 
 ```python
-from main import move, click
+from main import move, click, scroll, drag
 
-# Moves cursor from its current position to (x, y) with human kinematics
+# 1. Moves cursor from its current position to (x, y) with human kinematics
 move(800, 450)
 
-# Moves to (x, y) and performs a click with natural human dwell time
-click(800, 450)
+# 2. Moves to (x, y), performs pre-click hesitation, and clicks with human dwell time
+click(800, 450)                  # Defaults to left click
+click(800, 450, button="right")  # Right click
+
+# 3. Biological scrolling with multi-flick bursts, friction decay, and rebound
+scroll(600)   # Scrolls down 600px
+scroll(-300)  # Scrolls up 300px
+
+# 4. Realistic human drag-and-drop (captcha sliders, puzzle pieces, canvas)
+drag(800, 450)                                # Drag from current cursor position
+drag(800, 450, start_x=200, start_y=450)     # Drag from (200, 450) to (800, 450)
 ```
 
 ### Direct CLI Usage:
@@ -46,6 +54,9 @@ click(800, 450)
 ```bash
 python main.py 800 450
 python main.py click 800 450
+python main.py click 800 450 right
+python main.py scroll 600
+python main.py drag 200 450 800 450
 ```
 
 ---
@@ -93,22 +104,30 @@ graph TD
 A complete verification suite is provided under [`tests/`](file:///d:/stealth_mouse/tests) to mathematically and functionally prove anti-bot evasion properties:
 
 ```bash
-# Run full automated test suite (12 tests)
-pytest -v tests
+# 1. Universal Interactive & Visual Launcher:
+python all_tests.py              # Interactive visual menu (options 1 to 7)
+python all_tests.py --all        # Runs all 5 visual stages sequentially in real browser
+python all_tests.py --fast       # Runs 20 automated tests in background (headless)
 
-# Or run specific test modules directly:
-python tests/test_core.py                 # KDTree, Conformal Transforms, Splines, Path generation
-python tests/test_kinematics.py           # Asymmetric velocity bell curves, micro-tremors vs Bézier
-python tests/test_browser.py              # Headless Playwright integration & isTrusted: true checks
-python tests/test_interactive_browser.py  # Visible browser UI: Sandbox & Cloudflare Turnstile
+# 2. Or run specialized tests directly:
+python all_tests.py --recaptcha  # Live Google reCAPTCHA v3 (Score 0.9 evaluation)
+python all_tests.py --slider     # Live DataDome / GeeTest biometric slider challenge
+python all_tests.py --turnstile  # Live Cloudflare Turnstile challenge
+python all_tests.py --sandbox    # Live biometric telemetry dashboard
+python all_tests.py --targets    # Desktop full-screen target range
+
+# 3. Direct Pytest runner:
+pytest -v tests
 ```
 
-* **`tests/test_interactive_browser.py`:** Opens a **visible Chromium window (`headless=False`)** to directly watch cursor trajectories in real time:
-  * Run `--sandbox` for the live Biometric Telemetry Dashboard (displays canvas trail, speed, jitter, and real-time Anti-Bot classification).
-  * Run `--turnstile` for a live test on a real **Cloudflare Turnstile** challenge page.
-* **`tests/test_core.py`:** Tests KDTree sub-millisecond querying, conformal boundary preservation, and hybrid temporal blending.
-* **`tests/test_kinematics.py`:** Benchmarks `stealth_mouse` against naive synthetic Bézier curves, verifying biological acceleration/deceleration phases and hardware polling jitter ($\Delta t$). Also saves a visual diagnostic plot to `tests/kinematics_comparison.png`.
-* **`tests/test_browser.py`:** Launches headless Chromium via Playwright, listens to DOM JavaScript events, and verifies `event.isTrusted === true`, discrete trajectory events, and realistic human dwell time (45–130 ms).
+* **`all_tests.py` / `tests/test_interactive_browser.py`:** Opens a **visible Chromium window (`headless=False`)** to directly watch cursor trajectories in real time:
+  * **Google reCAPTCHA v3:** Evaluates live against Google's servers, demonstrating pure human score $\ge 0.7 - 0.9$ without image puzzles.
+  * **DataDome / GeeTest Biometric Slider:** Evaluates static breakaway friction delay, $\pm Y$ micro-tremor, and smooth drag physics.
+  * **Cloudflare Turnstile:** Navigates to a real Cloudflare challenge and passes with biometric click.
+  * **Telemetry Sandbox:** Live biometric scoring dashboard with canvas trail, speed bell curve, and `isTrusted` check.
+  * **Desktop Target Range:** Full-screen multi-target bullseye accuracy demonstration.
+* **`tests/test_kinematics.py`:** Benchmarks against synthetic Bézier curves, including **FFT spectral analysis** proving the presence of biological neuromuscular tremor (8–14 Hz band) and **stochastic entropy** guaranteeing zero deterministic replay signatures.
+* **`tests/test_browser.py`:** Tests headless Playwright integration for `click`, `scroll`, `drag`, and live Google reCAPTCHA v3 scoring.
 
 ### Biometric Validation (Synthetic Bézier vs. Stealth Mouse):
 

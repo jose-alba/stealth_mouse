@@ -181,5 +181,35 @@ class TestStealthMousePlayer(unittest.TestCase):
             self.assertAlmostEqual(path[-1, 1], y1, places=1)
 
 
+class TestHumanScroller(unittest.TestCase):
+    """Verifies biological scroll step generation and ballistic kinematics."""
+
+    def setUp(self):
+        from src.scroller import HumanScroller
+        self.scroller = HumanScroller(allow_overshoot=True)
+
+    def test_scroll_displacement_accuracy(self):
+        """Verifies net vertical displacement matches requested pixels exactly."""
+        for dy in [50.0, -120.0, 450.0, -800.0, 1500.0]:
+            steps = self.scroller.generate_steps(dy)
+            self.assertGreater(len(steps), 0)
+            net_dy = sum(s[0] for s in steps)
+            self.assertAlmostEqual(net_dy, dy, places=2, msg=f"Mismatch for target {dy}")
+
+    def test_polling_jitter_and_timing(self):
+        """Verifies step delays fall within realistic display refresh rates (60-120 Hz)."""
+        steps = self.scroller.generate_steps(600.0)
+        motion_steps = [s for s in steps if abs(s[0]) > 0]
+        self.assertGreater(len(motion_steps), 10)
+        for _, dt in motion_steps:
+            self.assertGreaterEqual(dt, 0.005, "Step dt too fast (< 5ms)")
+            self.assertLessEqual(dt, 0.035, "Step dt too slow (> 35ms)")
+
+    def test_zero_displacement(self):
+        """Verifies zero displacement returns empty steps."""
+        self.assertEqual(len(self.scroller.generate_steps(0.0)), 0)
+        self.assertEqual(len(self.scroller.generate_steps(0.5)), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

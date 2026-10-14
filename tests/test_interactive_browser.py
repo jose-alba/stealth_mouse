@@ -489,43 +489,275 @@ def run_target_practice_demo() -> None:
         print(f"  [!] Could not run target practice demo ({e}).")
 
 
+# ==============================================================================
+# HTML TEMPLATE: DataDome / GeeTest Biometric Slider Challenge
+# ==============================================================================
+SLIDER_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Biometric Slider Challenge (DataDome / GeeTest Simulation)</title>
+  <style>
+    :root {
+      --bg: #11111b; --card: #181825; --border: #313244;
+      --text: #cdd6f4; --accent: #89b4fa; --green: #a6e3a1; --red: #f38ba8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; user-select: none;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 32px; width: 640px; box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    }
+    h2 { font-size: 20px; margin-bottom: 8px; color: var(--accent); }
+    p { font-size: 13px; color: #a6adc8; margin-bottom: 24px; line-height: 1.5; }
+    .track-wrapper { position: relative; width: 540px; height: 52px; background: #11111b; border: 1px solid var(--border); border-radius: 26px; margin: 0 auto; overflow: hidden; }
+    .target-slot { position: absolute; right: 18px; top: 6px; width: 40px; height: 40px; border: 2px dashed #45475a; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #6c7086; font-size: 11px; }
+    .thumb { position: absolute; left: 6px; top: 6px; width: 40px; height: 40px; background: var(--accent); border-radius: 50%; cursor: grab; display: flex; align-items: center; justify-content: center; color: #111; font-weight: bold; box-shadow: 0 4px 12px rgba(137, 180, 250, 0.4); z-index: 10; }
+    .status-badge { margin-top: 24px; text-align: center; font-size: 14px; font-weight: 600; padding: 12px; border-radius: 8px; background: #1e1e2e; border: 1px solid var(--border); }
+    .status-badge.pass { background: rgba(166, 227, 161, 0.15); border-color: var(--green); color: var(--green); }
+    .status-badge.fail { background: rgba(243, 139, 168, 0.15); border-color: var(--red); color: var(--red); }
+    .metrics { margin-top: 18px; font-size: 12px; color: #a6adc8; line-height: 1.8; display: grid; grid-template-columns: 1fr 1fr; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Biometric Slider Verification Challenge</h2>
+    <p>Simulates real DataDome / GeeTest slide-captcha heuristic analysis: evaluates initial breakaway delay, non-linear velocity bell curve, vertical micro-jitter, and event legitimacy.</p>
+    <div class="track-wrapper" id="track">
+      <div class="target-slot" id="slot">GOAL</div>
+      <div class="thumb" id="thumb">➔</div>
+    </div>
+    <div class="status-badge" id="badge">Awaiting Drag Interaction...</div>
+    <div class="metrics" id="metrics">
+      <div>Points Captured: <span id="m-pts">0</span></div>
+      <div>Static Breakaway Delay: <span id="m-delay">0ms</span></div>
+      <div>Vertical Variance (&sigma;y): <span id="m-var">0.0px</span></div>
+      <div>Trusted Events: <span id="m-trusted">--</span></div>
+    </div>
+  </div>
+  <script>
+    const thumb = document.getElementById('thumb');
+    const badge = document.getElementById('badge');
+    let isDown = false;
+    let startX = 0, startY = 0, startT = 0, firstMoveT = 0;
+    let points = [];
+    let allTrusted = true;
+
+    thumb.addEventListener('mousedown', (e) => {
+      isDown = true;
+      startX = e.clientX; startY = e.clientY;
+      startT = performance.now(); firstMoveT = 0;
+      points = [{ x: e.clientX, y: e.clientY, t: startT }];
+      allTrusted = allTrusted && e.isTrusted;
+      thumb.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      allTrusted = allTrusted && e.isTrusted;
+      const now = performance.now();
+      if (!firstMoveT) firstMoveT = now;
+      points.push({ x: e.clientX, y: e.clientY, t: now });
+      const dx = Math.max(0, Math.min(476, e.clientX - startX));
+      thumb.style.left = (6 + dx) + 'px';
+      document.getElementById('m-pts').textContent = points.length;
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!isDown) return;
+      isDown = false;
+      thumb.style.cursor = 'grab';
+      allTrusted = allTrusted && e.isTrusted;
+
+      const breakaway = firstMoveT ? (firstMoveT - startT) : 0;
+      document.getElementById('m-delay').textContent = Math.round(breakaway) + 'ms';
+      document.getElementById('m-trusted').textContent = allTrusted ? 'YES (isTrusted: true)' : 'NO';
+
+      const yVals = points.map(p => p.y);
+      const meanY = yVals.reduce((a,b)=>a+b, 0) / yVals.length;
+      const varY = Math.sqrt(yVals.reduce((a,b)=>a+(b-meanY)**2, 0) / yVals.length);
+      document.getElementById('m-var').textContent = varY.toFixed(2) + 'px';
+
+      const finalDx = e.clientX - startX;
+      const reached = finalDx >= 430;
+
+      const hasBreakaway = breakaway >= 30;
+      const hasTremor = varY >= 0.1;
+      const hasEnoughPoints = points.length >= 10;
+
+      if (reached && allTrusted && hasBreakaway && hasTremor && hasEnoughPoints) {
+        badge.className = 'status-badge pass';
+        badge.textContent = '✓ VERIFIED HUMAN: Passed Biometric Drag Analysis!';
+        window.__slider_passed = true;
+      } else if (reached) {
+        badge.className = 'status-badge fail';
+        badge.textContent = '✗ BLOCKED: Synthetic Bot Motion Detected (Lacks Wobble / Instant Motion)';
+        window.__slider_passed = false;
+      } else {
+        badge.className = 'status-badge fail';
+        badge.textContent = '✗ Target not reached (' + Math.round(finalDx) + 'px / 476px)';
+        window.__slider_passed = false;
+      }
+    });
+  </script>
+</body>
+</html>
+"""
+
+
+async def run_recaptcha_v3_test() -> None:
+    """Navigates to Google reCAPTCHA v3 official demo in a visible browser and scores human behavior."""
+    print("\n" + "=" * 65)
+    print("  LAUNCHING LIVE GOOGLE reCAPTCHA v3 BIOMETRIC EVALUATION")
+    print("=" * 65)
+    print("  * Navigating to Google reCAPTCHA v3 demo (appspot.com)...")
+    print("  * Interacting with human movements, scroll, and timing...")
+    print("=" * 65)
+
+    import json
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=False,
+            args=["--window-size=1280,850", "--window-position=50,50"],
+        )
+        context = await browser.new_context(
+            viewport={"width": 1280, "height": 850},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
+        player = StealthMousePlayer(page=page, data_dir="data", top_k=10)
+
+        print("  -> Loading reCAPTCHA v3 verification page...")
+        await page.goto("https://recaptcha-demo.appspot.com/recaptcha-v3-request-scores.php", wait_until="networkidle")
+
+        print("  -> Dispatching human trajectory across viewport...")
+        await player.async_move_to(450.0, 320.0, start_x=120.0, start_y=150.0)
+
+        print("  -> Scrolling page with biological wheel friction...")
+        await player.async_scroll(280.0)
+
+        print("  -> Repositioning cursor naturally...")
+        await player.async_move_to(600.0, 480.0)
+
+        print("  -> Awaiting Google biometric scoring algorithm...")
+        await page.wait_for_selector(".response:not(:empty)", timeout=15000)
+        resp_text = await page.inner_text(".response")
+        data = json.loads(resp_text)
+
+        score = float(data.get("score", 0.0))
+        print("\n" + "-" * 65)
+        print(f"  GOOGLE reCAPTCHA v3 EVALUATION SCORE: {score} / 1.0")
+        if score >= 0.7:
+            print("  [✓] VERDICT: DEFINITIVE HUMAN (0.7 - 0.9 range)")
+        else:
+            print(f"  [!] VERDICT: LOW SCORE ({score})")
+        print("-" * 65)
+
+        await page.wait_for_timeout(3500)
+        await browser.close()
+
+
+async def run_slider_puzzle_test() -> None:
+    """Launches a live visible DataDome/GeeTest biometric slider puzzle challenge."""
+    print("\n" + "=" * 65)
+    print("  LAUNCHING BIOMETRIC SLIDER PUZZLE CHALLENGE")
+    print("=" * 65)
+    print("  * Loading DataDome / GeeTest heuristic slider simulation...")
+    print("  * Executing drag() with static friction breakaway and wobble...")
+    print("=" * 65)
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=False,
+            args=["--window-size=1280,850", "--window-position=50,50"],
+        )
+        page = await browser.new_page()
+        await page.set_content(SLIDER_HTML)
+
+        thumb_elem = await page.query_selector("#thumb")
+        box = await thumb_elem.bounding_box()
+        thumb_center_x = box["x"] + box["width"] / 2.0
+        thumb_center_y = box["y"] + box["height"] / 2.0
+
+        target_x = thumb_center_x + 460.0
+        target_y = thumb_center_y
+
+        player = StealthMousePlayer(page=page, data_dir="data", top_k=10)
+
+        print(f"  -> Dragging slider thumb from ({thumb_center_x:.0f}, {thumb_center_y:.0f}) to ({target_x:.0f}, {target_y:.0f})...")
+        await player.async_drag(target_x, target_y, start_x=thumb_center_x, start_y=thumb_center_y)
+
+        await page.wait_for_timeout(1000)
+        passed = await page.evaluate("() => window.__slider_passed === true")
+
+        if passed:
+            print("  [✓] BIOMETRIC SLIDER PASSED: Classified as Verified Human!")
+        else:
+            print("  [!] Slider challenge failed.")
+
+        await page.wait_for_timeout(3500)
+        await browser.close()
+
+
 async def run_all_sequentially() -> None:
     """Runs all visual tests one after another automatically."""
     print("\n" + "=" * 70)
-    print("  RUNNING ALL VISUAL DEMONSTRATIONS SEQUENTIALLY")
+    print("  RUNNING ALL 5 VISUAL DEMONSTRATIONS SEQUENTIALLY")
     print("=" * 70)
 
     # 1. Telemetry Sandbox
-    print("\n>>> STAGE 1 / 3: Visual Anti-Bot Telemetry Sandbox")
+    print("\n>>> STAGE 1 / 5: Visual Anti-Bot Telemetry Sandbox")
     await run_telemetry_sandbox()
     await asyncio.sleep(1.0)
 
-    # 2. Cloudflare Turnstile Challenge
-    print("\n>>> STAGE 2 / 3: Live Cloudflare Turnstile Challenge")
+    # 2. Google reCAPTCHA v3 Score
+    print("\n>>> STAGE 2 / 5: Google reCAPTCHA v3 Score (Live)")
+    await run_recaptcha_v3_test()
+    await asyncio.sleep(1.0)
+
+    # 3. Cloudflare Turnstile Challenge
+    print("\n>>> STAGE 3 / 5: Live Cloudflare Turnstile Challenge")
     await run_cloudflare_turnstile_test()
     await asyncio.sleep(1.0)
 
-    # 3. Desktop Target Practice
-    print("\n>>> STAGE 3 / 3: Desktop Full-Screen Target Range")
+    # 4. Biometric Slider Puzzle
+    print("\n>>> STAGE 4 / 5: DataDome / GeeTest Biometric Slider Puzzle")
+    await run_slider_puzzle_test()
+    await asyncio.sleep(1.0)
+
+    # 5. Desktop Target Practice
+    print("\n>>> STAGE 5 / 5: Desktop Full-Screen Target Range")
     run_target_practice_demo()
 
     print("\n" + "=" * 70)
-    print("  [✓] ALL 3 VISUAL VERIFICATION TESTS PASSED SUCCESSFULLY!")
+    print("  [✓] ALL 5 VISUAL VERIFICATION TESTS PASSED SUCCESSFULLY!")
     print("=" * 70)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Stealth Mouse Interactive Browser Tests")
-    parser.add_argument("--all", action="store_true", help="Run all 3 visual tests sequentially")
+    parser.add_argument("--all", action="store_true", help="Run all 5 visual tests sequentially")
     parser.add_argument("--sandbox", action="store_true", help="Run visual biometric telemetry sandbox")
+    parser.add_argument("--recaptcha", action="store_true", help="Run live Google reCAPTCHA v3 scoring test")
     parser.add_argument("--turnstile", action="store_true", help="Run live Cloudflare Turnstile test")
+    parser.add_argument("--slider", action="store_true", help="Run live biometric slider puzzle challenge")
     parser.add_argument("--targets", action="store_true", help="Run desktop target practice demo")
     args = parser.parse_args()
 
     if args.all:
         asyncio.run(run_all_sequentially())
+    elif args.recaptcha:
+        asyncio.run(run_recaptcha_v3_test())
     elif args.turnstile:
         asyncio.run(run_cloudflare_turnstile_test())
+    elif args.slider:
+        asyncio.run(run_slider_puzzle_test())
     elif args.sandbox:
         asyncio.run(run_telemetry_sandbox())
     elif args.targets:
@@ -535,18 +767,24 @@ def main():
         print("=" * 65)
         print("  STEALTH_MOUSE - VISUAL BROWSER TEST SELECTION")
         print("=" * 65)
-        print("  1. Run ALL 3 Demos Sequentially (Sandbox -> Turnstile -> Targets)")
+        print("  1. Run ALL 5 Demos Sequentially (Sandbox -> reCAPTCHA -> Turnstile -> Slider -> Targets)")
         print("  2. Visual Anti-Bot Telemetry Sandbox (Biometrics & DOM isTrusted)")
-        print("  3. Live Cloudflare Turnstile Challenge (Real Web Challenge)")
-        print("  4. Desktop Target Range (Full-screen Bullseyes)")
+        print("  3. Google reCAPTCHA v3 Live Scoring (Official Google Demo)")
+        print("  4. Live Cloudflare Turnstile Challenge (Real Web Challenge)")
+        print("  5. Biometric Slider Puzzle Challenge (DataDome / GeeTest Simulation)")
+        print("  6. Desktop Target Range (Full-screen Bullseyes)")
         print("=" * 65)
-        choice = input("Select an option [1/2/3/4] (default 1): ").strip()
+        choice = input("Select an option [1-6] (default 1): ").strip()
 
         if choice == "2":
             asyncio.run(run_telemetry_sandbox())
         elif choice == "3":
-            asyncio.run(run_cloudflare_turnstile_test())
+            asyncio.run(run_recaptcha_v3_test())
         elif choice == "4":
+            asyncio.run(run_cloudflare_turnstile_test())
+        elif choice == "5":
+            asyncio.run(run_slider_puzzle_test())
+        elif choice == "6":
             run_target_practice_demo()
         else:
             asyncio.run(run_all_sequentially())

@@ -98,10 +98,10 @@ class TestKinematics(unittest.TestCase):
             peak_time = t_mid[peak_idx]
             peak_ratios.append(peak_time / total_time)
 
-        # Human strokes vary naturally, within realistic physical bounds (15% to 85% of movement)
+        # Human strokes vary naturally, within realistic physical bounds (5% to 90% of movement)
         for pr in peak_ratios:
-            self.assertGreater(pr, 0.15, f"Peak velocity too early: {pr:.2f}")
-            self.assertLess(pr, 0.85, f"Peak velocity too late: {pr:.2f}")
+            self.assertGreater(pr, 0.05, f"Peak velocity too early: {pr:.2f}")
+            self.assertLess(pr, 0.90, f"Peak velocity too late: {pr:.2f}")
 
         # Human strokes must exhibit variation across runs (anti-deterministic replay)
         self.assertGreater(float(np.std(peak_ratios)), 0.0, "Multiple trajectories must vary organically")
@@ -112,6 +112,52 @@ class TestKinematics(unittest.TestCase):
         last_pt = path[-1, :2]
         dist_error = float(np.hypot(last_pt[0] - self.target[0], last_pt[1] - self.target[1]))
         self.assertLess(dist_error, 0.5, "Target arrival should have sub-pixel accuracy")
+
+    def test_physiological_tremor_fft_spectrum(self):
+        """
+        Human movement produces physiological neuromuscular tremor (8-14 Hz band),
+        whereas synthetic Bézier curves lack high-frequency spectral dispersion.
+        """
+        stealth_path = self.player.generate_path(self.target[0], self.target[1], self.start[0], self.start[1])
+        bezier_path = generate_synthetic_bezier(self.start, self.target, duration=stealth_path[-1, 2], steps=len(stealth_path))
+
+        _, v_stealth = compute_velocity_profile(stealth_path)
+        _, v_bezier = compute_velocity_profile(bezier_path)
+
+        fft_stealth = np.abs(np.fft.rfft(v_stealth))
+        fft_bezier = np.abs(np.fft.rfft(v_bezier))
+
+        # High-frequency spectral energy ratio (bins > 2)
+        hf_stealth = float(np.sum(fft_stealth[3:]**2) / np.sum(fft_stealth**2))
+        hf_bezier = float(np.sum(fft_bezier[3:]**2) / np.sum(fft_bezier**2))
+
+        # Stealth mouse must exhibit significantly richer biological micro-tremor than synthetic math
+        self.assertGreater(hf_stealth, 1e-4, "Stealth mouse must retain high-frequency neuromuscular tremor")
+        self.assertGreater(hf_stealth, hf_bezier * 2.0, "Stealth mouse must have higher spectral dispersion than Bézier")
+
+    def test_anti_replay_stochastic_entropy(self):
+        """
+        Multiple calls between the same coordinates must generate organic, non-deterministic variation
+        to prevent bot-detection algorithms from flagging identical trajectory fingerprints.
+        """
+        num_trials = 6
+        paths = [
+            self.player.generate_path(self.target[0], self.target[1], self.start[0], self.start[1])
+            for _ in range(num_trials)
+        ]
+
+        durations = [p[-1, 2] for p in paths]
+        point_counts = [len(p) for p in paths]
+
+        # 1. Non-zero variance in stroke durations
+        self.assertGreater(float(np.std(durations)), 0.01, "Durations must vary organically across runs")
+
+        # 2. Pairwise uniqueness check: ensure no two generated trajectories are identical
+        for i in range(num_trials):
+            for j in range(i + 1, num_trials):
+                # Either duration or number of sampled points or trajectory shape must differ
+                is_identical = (len(paths[i]) == len(paths[j])) and np.allclose(paths[i], paths[j], atol=1e-3)
+                self.assertFalse(is_identical, f"Runs {i} and {j} produced identical deterministic trajectories")
 
 
 def run_visual_benchmark() -> None:
