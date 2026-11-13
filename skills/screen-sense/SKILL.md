@@ -2,13 +2,13 @@
 name: screen-sense
 description: >-
   Use this skill whenever you need to visually observe the desktop or screen state, query display
-  resolution, monitor bounds, DPI scaling, or track the current mouse cursor position before or
-  after executing GUI actions.
+  resolution, monitor bounds, DPI scaling, generate targeting reticle/crosshair previews,
+  or track the current mouse cursor position before or after executing GUI actions.
 ---
 
 # Screen Sense: Agent Visual Perception & Geometry Protocol
 
-`screen-sense` acts as the sensory visual system for AI agents. It captures screenshots of the desktop or specific regions, inspects screen resolution, checks multi-monitor geometry, and tracks the exact cursor position without permission or session errors.
+`screen-sense` acts as the sensory visual system for AI agents. It captures screenshots of the desktop, generates dynamic ~1/4 screen context crosshair previews, inspects screen resolution, and tracks cursor coordinates without session or permission errors.
 
 ## CLI Executables
 
@@ -18,34 +18,20 @@ The tool is located in `scripts/sense_cli.py`:
 
 ## Commands
 
-### 1. Inspect Screen Geometry & Cursor
+### 1. Dynamic Context Aim Preview (~1/4 Screen with Crosshair)
 ```bash
-python scripts/sense_cli.py info
+python scripts/sense_cli.py aim <X> <Y> [--scale 0.5]
 ```
-Returns:
-```json
-{
-  "platform": "win32",
-  "width": 1920,
-  "height": 1080,
-  "cursor_x": 960,
-  "cursor_y": 540,
-  "dpi_aware": true
-}
-```
+Generates a generous crop (half width, half height of screen) centered on $(X, Y)$ with a large, double-stroke high-contrast crosshair, targeting ring, and coordinate badge. Allows the LLM to verify accuracy before physically clicking.
 
 ### 2. Capture Full Screen
 ```bash
-python scripts/sense_cli.py capture
+python scripts/sense_cli.py capture [--out path.png]
 ```
-Saves the screenshot to a temporary folder and outputs the file path. The agent can then inspect this image using visual analysis tools to find UI elements and determine target coordinates $(x, y)$.
+Saves screenshot to a temporary folder and outputs file path and resolution.
 
-### 3. Capture Specific Bounding Region
+### 3. Inspect Screen Geometry & Cursor
 ```bash
-python scripts/sense_cli.py capture --region 200 150 800 600 --out "screen_crop.png"
+python scripts/sense_cli.py info
+python scripts/sense_cli.py pos
 ```
-
-## Best Practices
-1. **Always Sense First**: Before executing a click or drag, run `capture` or `info` to verify the resolution and verify where the target button or window actually is.
-2. **DPI Awareness**: All returned coordinates are DPI-normalized to match physical screen pixels.
-
