@@ -1,32 +1,86 @@
 # Stealth Mouse
 
-Human-like mouse trajectory generation and conformal transformation designed for modern anti-bot evasion (Cloudflare Turnstile, DataDome, Kasada, Akamai).
+Human-like mouse trajectory generation, conformal transformation, and autonomous AI agent skills designed for modern anti-bot evasion (Cloudflare Turnstile, DataDome, Kasada, Akamai) and computer vision navigation.
 
 <p align="center">
-  <img src="demo.gif" alt="Stealth Mouse Pipeline Animation" width="100%">
+  <img src="docs/demo.gif" alt="Stealth Mouse Pipeline Animation" width="100%">
 </p>
 
 Instead of generating synthetic mathematical curves (such as Bézier or Perlin noise, which lack natural physiological tremor and exhibit detectable statistical regularities), **Stealth Mouse** retrieves real recorded human gestures and applies conformal transformations to fit arbitrary target coordinates while preserving micro-corrections and biomechanical kinematics.
 
 ---
 
-## 1. Record Dataset (Recorder)
+## ⚡ Agent Skills & Autonomous Navigation (`/goto`)
 
-Record your own daily mouse movements to populate or expand your database:
+Stealth Mouse includes a complete suite of decoupled agent skills compatible with **Google Antigravity** and **Claude Code**, allowing any AI coding agent to autonomously perceive the desktop, design architecture flowcharts, and navigate your OS with human kinematics.
 
-```bash
-python -m src.recorder
+### ⚡ Quick Install Skills (PowerShell)
+
+```powershell
+# Installs goto, screen-sense, screen-actor, and flowchart into ~/.gemini and ~/.claude
+powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-* **Save & Exit:** Press `Ctrl` + `C` + `P` simultaneously.
+```bash
+# Linux / macOS (Bash)
+bash install.sh
+```
 
-Strokes are automatically segmented click-to-click, idle dead pauses are discarded, and data is accumulated into two complementary files in `data/`:
-1. `data/trajectories_index.npz`: 3D descriptors `[log(d), cos(θ), sin(θ)]` and offsets for the KDTree.
-2. `data/trajectories_points.npz`: Contiguous high-frequency coordinate bank `[x, y, t]` accessed in $O(1)$ time.
+### Core Agent Skills
+
+```text
+/goto: <prompt>  ──►  Autonomous Navigator: Generates an initial milestone roadmap,
+                       senses the screen iteratively, executes stealth actions,
+                       and dynamically corrects course when unexpected popups appear.
+
+screen-sense     ──►  Agent Eyes: Captures high-res desktop screenshots, retrieves physical
+                       screen dimensions, DPI scaling, and tracks exact cursor coordinates.
+
+screen-actor     ──►  Agent Hands: Dispatches human-like mouse movements, dwell clicks,
+                       realistic multi-flick scrolling, drag & drop, and typing keystrokes.
+
+flowchart        ──►  Visual Architecture: Designs error-free Mermaid diagrams and flowcharts
+                       with standardized semantic shapes and built-in syntax validation.
+```
+
+### Self-Contained Skill Architecture
+
+```text
+stealth_mouse/
+├── skills/
+│   ├── stealth_mouse_common/        # Isolated shared core (display, paths, vision, data)
+│   │   ├── data/                    # Trajectory database (.npz)
+│   │   ├── core/                    # Kinematics engine
+│   │   ├── desktop.py               # Windows desktop session & DPI manager
+│   │   ├── vision.py                # Screenshot capture & bounding logic
+│   │   └── engine.py                # Standardized JSON response wrapper
+│   │
+│   ├── goto/                        # Autonomous navigation protocol
+│   │   ├── SKILL.md
+│   │   └── scripts/plan_helper.py
+│   │
+│   ├── screen-sense/                # Sensory visual perception
+│   │   ├── SKILL.md
+│   │   └── scripts/sense_cli.py
+│   │
+│   ├── screen-actor/                # Kinematic motor execution
+│   │   ├── SKILL.md
+│   │   └── scripts/actor_cli.py
+│   │
+│   └── flowchart/                   # Visual architecture & flowcharts
+│       ├── SKILL.md
+│       └── scripts/validate.py
+│
+├── install.ps1 / install.sh         # One-click global skill installers
+├── docs/                            # Animations, assets & demos
+├── data/                            # Local recorded dataset
+├── src/                             # Core library source
+└── README.md
+```
 
 ---
 
-## 2. Minimalist Public API (`move`, `click`, `scroll`, `drag`)
+## 1. Minimalist Public API (`move`, `click`, `scroll`, `drag`)
 
 ### Python API:
 
@@ -58,6 +112,22 @@ python main.py click 800 450 right
 python main.py scroll 600
 python main.py drag 200 450 800 450
 ```
+
+---
+
+## 2. Record Dataset (Recorder)
+
+Record your own daily mouse movements to populate or expand your database:
+
+```bash
+python -m src.recorder
+```
+
+* **Save & Exit:** Press `Ctrl` + `C` + `P` simultaneously.
+
+Strokes are automatically segmented click-to-click, idle dead pauses are discarded, and data is accumulated into two complementary files in `data/`:
+1. `data/trajectories_index.npz`: 3D descriptors `[log(d), cos(θ), sin(θ)]` and offsets for the KDTree.
+2. `data/trajectories_points.npz`: Contiguous high-frequency coordinate bank `[x, y, t]` accessed in $O(1)$ time.
 
 ---
 
@@ -119,15 +189,6 @@ python all_tests.py --targets    # Desktop full-screen target range
 # 3. Direct Pytest runner:
 pytest -v tests
 ```
-
-* **`all_tests.py` / `tests/test_interactive_browser.py`:** Opens a **visible Chromium window (`headless=False`)** to directly watch cursor trajectories in real time:
-  * **Google reCAPTCHA v3:** Evaluates live against Google's servers, demonstrating pure human score $\ge 0.7 - 0.9$ without image puzzles.
-  * **DataDome / GeeTest Biometric Slider:** Evaluates static breakaway friction delay, $\pm Y$ micro-tremor, and smooth drag physics.
-  * **Cloudflare Turnstile:** Navigates to a real Cloudflare challenge and passes with biometric click.
-  * **Telemetry Sandbox:** Live biometric scoring dashboard with canvas trail, speed bell curve, and `isTrusted` check.
-  * **Desktop Target Range:** Full-screen multi-target bullseye accuracy demonstration.
-* **`tests/test_kinematics.py`:** Benchmarks against synthetic Bézier curves, including **FFT spectral analysis** proving the presence of biological neuromuscular tremor (8–14 Hz band) and **stochastic entropy** guaranteeing zero deterministic replay signatures.
-* **`tests/test_browser.py`:** Tests headless Playwright integration for `click`, `scroll`, `drag`, and live Google reCAPTCHA v3 scoring.
 
 ### Biometric Validation (Synthetic Bézier vs. Stealth Mouse):
 

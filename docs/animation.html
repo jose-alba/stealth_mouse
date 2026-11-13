@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stealth Mouse - ¿Cómo funciona? (Animación Explicativa)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    body {
+      background: #0f111a;
+      color: #cdd6f4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    header {
+      text-align: center;
+      max-width: 820px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 26px;
+      color: #89b4fa;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+    p.subtitle {
+      color: #a6adc8;
+      font-size: 14px;
+    }
+    .stage-container {
+      background: #181825;
+      border: 1px solid #313244;
+      border-radius: 16px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      padding: 18px;
+      width: 100%;
+      max-width: 920px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    /* Steps navigation bar */
+    .steps-nav {
+      display: flex;
+      width: 100%;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 6px;
+    }
+    .step-pill {
+      flex: 1;
+      text-align: center;
+      padding: 10px 6px;
+      background: #11111b;
+      border: 1px solid #313244;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #6c7086;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      user-select: none;
+    }
+    .step-pill.active {
+      background: #1e1e2e;
+      border-color: #89b4fa;
+      color: #89b4fa;
+      box-shadow: 0 0 14px rgba(137, 180, 250, 0.25);
+    }
+    .step-pill.completed {
+      border-color: #a6e3a1;
+      color: #a6e3a1;
+    }
+    /* Canvas area */
+    canvas {
+      background: #11111b;
+      border: 1px solid #313244;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 880px;
+      height: 420px;
+      display: block;
+    }
+    /* Description card */
+    .info-box {
+      margin-top: 14px;
+      padding: 14px 18px;
+      background: #1e1e2e;
+      border-radius: 12px;
+      border-left: 4px solid #89b4fa;
+      width: 100%;
+      max-width: 880px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .info-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #f9e2af;
+    }
+    .info-desc {
+      font-size: 13.5px;
+      color: #bac2de;
+      line-height: 1.45;
+    }
+    /* Control buttons */
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    button {
+      background: #89b4fa;
+      color: #11111b;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #b4befe;
+      transform: translateY(-1px);
+    }
+    button.secondary {
+      background: #313244;
+      color: #cdd6f4;
+    }
+    button.secondary:hover {
+      background: #45475a;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Stealth Mouse: Funcionamiento y Concepto</h1>
+    <p class="subtitle">Búsqueda y deformación de trazos humanos reales para eludir antibots</p>
+  </header>
+
+  <div class="stage-container">
+    <div class="steps-nav">
+      <div id="pill-1" class="step-pill active" onclick="setStep(1)">1. Grabar Dataset</div>
+      <div id="pill-2" class="step-pill" onclick="setStep(2)">2. Búsqueda KDTree</div>
+      <div id="pill-3" class="step-pill" onclick="setStep(3)">3. Transformación 2D</div>
+      <div id="pill-4" class="step-pill" onclick="setStep(4)">4. Spline & Tiempo</div>
+      <div id="pill-5" class="step-pill" onclick="setStep(5)">5. Inyección Final</div>
+    </div>
+
+    <canvas id="animCanvas" width="880" height="420"></canvas>
+
+    <div class="info-box">
+      <div id="infoTitle" class="info-title">Paso 1: Grabación y Segmentación por Clics</div>
+      <div id="infoDesc" class="info-desc">
+        Se graban y almacenan cientos/miles de movimientos humanos de desplazamientos cotidianos con hooks del sistema operativo.
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="btnPrev" class="secondary" onclick="prevStep()">◀ Anterior</button>
+      <button id="btnPlay" onclick="togglePlay()">⏸ Pausar</button>
+      <button id="btnNext" onclick="nextStep()">Siguiente ▶</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('animCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let currentStep = 1;
+    let isPlaying = true;
+    let animProgress = 0.0;
+    let lastTime = performance.now();
+
+    const stepsInfo = {
+      1: {
+        title: "1. Grabación y Segmentación Clic a Clic (recorder.py)",
+        desc: "Se graban y almacenan cientos/miles de movimientos humanos de desplazamientos cotidianos. Cada vez que haces clic, se corta el segmento anterior (cambia de color) y se guarda como un trazo independiente en data/.",
+        color: "#89b4fa"
+      },
+      2: {
+        title: "2. Coordenadas A->B a Vector 3D y Búsqueda KDTree (indexer.py)",
+        desc: "Leemos inicio (x0, y0) y final (x1, y1) -> transformamos a vector 3D: [log(distancia), cos(θ), sin(θ)]. En el espacio de descriptores, el KDTree busca los mejores candidatos en < 0.1 ms y escoge 1 para ejecutar.",
+        color: "#f9e2af"
+      },
+      3: {
+        title: "3. Transformación Conforme Exacta al Objetivo (transformer.py)",
+        desc: "El trazo real escogido se traslada al origen, se rota con el ángulo exacto y se escala en distancia. La curva llega con total precisión matemática desde el Punto A hasta el Punto B.",
+        color: "#f38ba8"
+      },
+      4: {
+        title: "4. Spline Continuo y Tiempo Híbrido (interpolator.py)",
+        desc: "Si la distancia del trazo es cercana a la meta (lo habitual con KDTree), se usa el 100% de tu tiempo humano real sin tocar nada. Solo si hay un estiramiento grande, Fitts amortigua suavemente. El spline densifica los puntos a 60-120 Hz.",
+        color: "#cba6f7"
+      },
+      5: {
+        title: "5. Inyección en Navegador / SO (player.py)",
+        desc: "El cursor físico o Playwright/CDP reproduce el movimiento punto por punto y ejecuta el clic final con tiempo de retención humano (dwell time), obteniendo eventos nativos con 'isTrusted: true'.",
+        color: "#a6e3a1"
+      }
+    };
+
+    // Generador de trazo con temblor fisiológico humano
+    function generateHumanStroke(x0, y0, x1, y1, steps, bendFactor = 24, tremorAmp = 3) {
+      const pts = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const bend = Math.sin(t * Math.PI) * bendFactor * Math.sin(t * 1.4);
+        const tremor = (Math.sin(t * 38) + Math.cos(t * 54)) * tremorAmp * Math.sin(t * Math.PI);
+
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+
+        const px = x0 + dx * t + nx * (bend + tremor);
+        const py = y0 + dy * t + ny * (bend + tremor);
+        pts.push({ x: px, y: py, t: t });
+      }
+      return pts;
+    }
+
+    // 4 trazos secuenciales continuos para el Paso 1 (Clic 1 -> Clic 2 -> Clic 3 -> Clic 4)
+    const segColors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#cba6f7"];
+    const seg1 = generateHumanStroke(90, 310, 290, 160, 45, 26, 3.5);
+    const seg2 = generateHumanStroke(290, 160, 520, 330, 45, -28, 3.8);
+    const seg3 = generateHumanStroke(520, 330, 750, 180, 45, 22, 3.2);
+    const seg4 = generateHumanStroke(750, 180, 430, 240, 45, -20, 3.4);
+    const allSegments = [seg1, seg2, seg3, seg4];
+
+    // Trazo base para los pasos 2, 3, 4, 5
+    const baseStroke = generateHumanStroke(100, 280, 480, 160, 65, 28, 3.8);
+
+    // Transformación Conforme Exacta
+    function transformStrokeExact(sourceStroke, x0, y0, x1, y1) {
+      const p0 = sourceStroke[0];
+      const pEnd = sourceStroke[sourceStroke.length - 1];
+      const srcDx = pEnd.x - p0.x;
+      const srcDy = pEnd.y - p0.y;
+      const srcDist = Math.hypot(srcDx, srcDy) || 1;
+      const srcAngle = Math.atan2(srcDy, srcDx);
+
+      const targetDx = x1 - x0;
+      const targetDy = y1 - y0;
+      const targetDist = Math.hypot(targetDx, targetDy);
+      const targetAngle = Math.atan2(targetDy, targetDx);
+
+      const deltaAngle = targetAngle - srcAngle;
+      const scale = targetDist / srcDist;
+
+      return sourceStroke.map((p, idx) => {
+        if (idx === 0) return { x: x0, y: y0, t: p.t };
+        if (idx === sourceStroke.length - 1) return { x: x1, y: y1, t: p.t };
+
+        const rx0 = p.x - p0.x;
+        const ry0 = p.y - p0.y;
+        const rotX = rx0 * Math.cos(deltaAngle) - ry0 * Math.sin(deltaAngle);
+        const rotY = rx0 * Math.sin(deltaAngle) + ry0 * Math.cos(deltaAngle);
+        return {
+          x: x0 + rotX * scale,
+          y: y0 + rotY * scale,
+          t: p.t
+        };
+      });
+    }
+
+    const targetA = { x: 130, y: 310 };
+    const targetB = { x: 740, y: 150 };
+    const transformedStroke = transformStrokeExact(baseStroke, targetA.x, targetA.y, targetB.x, targetB.y);
+
+    function drawGrid() {
+      ctx.strokeStyle = '#181825';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 36) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 36) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+    }
+
+    function drawCursorIcon(x, y) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#11111b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, 18);
+      ctx.lineTo(5, 14);
+      ctx.lineTo(10, 22);
+      ctx.lineTo(13, 20);
+      ctx.lineTo(8, 12);
+      ctx.lineTo(15, 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawTargetPin(x, y, label, isHit = false) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = '#1e1e2e';
+      ctx.fill();
+      ctx.strokeStyle = isHit ? '#a6e3a1' : '#89b4fa';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.fillStyle = '#313244';
+      ctx.fill();
+      ctx.strokeStyle = '#cdd6f4';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = isHit ? '#a6e3a1' : '#f38ba8';
+      ctx.fill();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - 8, y); ctx.lineTo(x + 8, y);
+      ctx.moveTo(x, y - 8); ctx.lineTo(x, y + 8);
+      ctx.stroke();
+
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = 'bold 12px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x, y + 34);
+      ctx.restore();
+    }
+
+    // ==============================================================================
+    // PASO 1: Ratón moviéndose continuamente con 4 clics que cambian de color
+    // ==============================================================================
+    function renderStep1(progress) {
+      ctx.fillStyle = '#89b4fa';
+      ctx.font = 'bold 16px Segoe UI';
+      ctx.fillText('1. Grabación: El ratón se mueve y cada CLIC corta y guarda un trazo (cambia de color)', 35, 38);
+
+      const numSegs = allSegments.length; // 4 segmentos
+      const totalUnits = progress * numSegs;
+      const activeSegIndex = Math.min(numSegs - 1, Math.floor(totalUnits));
+      const segLocalProgress = totalUnits - activeSegIndex;
+
+      let currentCursorX = allSegments[0][0].x;
+      let currentCursorY = allSegments[0][0].y;
+
+      // Dibujar los segmentos ya completados
+      for (let s = 0; s < activeSegIndex; s++) {
+        const seg = allSegments[s];
+        const col = segColors[s];
+
+        ctx.beginPath();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 3;
+        for (let i = 0; i < seg.length; i++) {
+          if (i === 0) ctx.moveTo(seg[i].x, seg[i].y);
+          else ctx.lineTo(seg[i].x, seg[i].y);
+        }
+        ctx.stroke();
+
+        // Puntos muestreados del trazo completado
+        for (let i = 0; i < seg.length; i += 3) {
+          ctx.beginPath();
+          ctx.arc(seg[i].x, seg[i].y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = col;
+          ctx.fill();
+        }
+
+        // Marcar el punto de clic donde terminó este segmento
+        const endPt = seg[seg.length - 1];
+        ctx.beginPath();
+        ctx.arc(endPt.x, endPt.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+
+        ctx.fillStyle = col;
+        ctx.font = 'bold 11.5px Segoe UI';
+        ctx.fillText(`Clic #${s + 1} ✓`, endPt.x + 12, endPt.y + 4);
+      }
+
+      // Dibujar el segmento activo en progreso
+      const activeSeg = allSegments[activeSegIndex];
+      const activeCol = segColors[activeSegIndex];
+      const count = Math.min(activeSeg.length, Math.floor(segLocalProgress * activeSeg.length));
+
+      ctx.beginPath();
+      ctx.strokeStyle = activeCol;
+      ctx.lineWidth = 3;
+      for (let i = 0; i < count; i++) {
+        if (i === 0) ctx.moveTo(activeSeg[i].x, activeSeg[i].y);
+        else ctx.lineTo(activeSeg[i].x, activeSeg[i].y);
+      }
+      ctx.stroke();
+
+      for (let i = 0; i < count; i += 3) {
+        ctx.beginPath();
+        ctx.arc(activeSeg[i].x, activeSeg[i].y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = activeCol;
+        ctx.fill();
+      }
+
+      if (count > 0 && count <= activeSeg.length) {
+        const cur = activeSeg[count - 1];
+        currentCursorX = cur.x;
+        currentCursorY = cur.y;
+      }
+
+      // Onda expansiva de clic cuando se llega al final de un segmento
+      if (segLocalProgress > 0.90) {
+        const endPt = activeSeg[activeSeg.length - 1];
+        const ripple = (segLocalProgress - 0.90) * 10 * 25;
+        ctx.beginPath();
+        ctx.arc(endPt.x, endPt.y, ripple, 0, Math.PI * 2);
+        ctx.strokeStyle = activeCol;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = activeCol;
+        ctx.font = 'bold 14px Segoe UI';
+        ctx.fillText(`¡CLIC #${activeSegIndex + 1}!`, endPt.x + 14, endPt.y - 12);
+      }
+
+      // Dibujar el ratón físico en movimiento
+      drawCursorIcon(currentCursorX, currentCursorY);
+
+      // Panel lateral informativo del grabador
+      const bx = 620, by = 260, bw = 230, bh = 135;
+      ctx.fillStyle = '#1e1e2e';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = '#89b4fa';
+      ctx.strokeRect(bx, by, bw, bh);
+
+      ctx.fillStyle = '#89b4fa';
+      ctx.font = 'bold 12.5px Segoe UI';
+      ctx.fillText('📦 Grabador (recorder.py)', bx + 15, by + 25);
+
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = '11.5px Segoe UI';
+      ctx.fillText(`• Clic actual: #${activeSegIndex + 1} de 4`, bx + 15, by + 50);
+      ctx.fillText(`• Segmentos guardados: ${activeSegIndex}`, bx + 15, by + 72);
+
+      ctx.fillStyle = segColors[activeSegIndex];
+      ctx.font = 'bold 12px Segoe UI';
+      ctx.fillText(`• Grabando Trazo #${activeSegIndex + 1} (${activeCol})`, bx + 15, by + 96);
+
+      ctx.fillStyle = '#a6adc8';
+      ctx.font = '10.5px Segoe UI';
+      ctx.fillText('Puntos acumulados en data/', bx + 15, by + 118);
+    }
+
+    // PASO 2: Búsqueda KDTree
+    function renderStep2(progress) {
+      ctx.fillStyle = '#f9e2af';
+      ctx.font = 'bold 16px Segoe UI';
+      ctx.fillText('2. Búsqueda: Coordenadas (A -> B) se transforman a Vector 3D y se escoge 1 trazo', 35, 38);
+
+      drawTargetPin(140, 270, 'Inicio A (x0, y0)');
+      drawTargetPin(400, 160, 'Destino B (x1, y1)');
+
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = '#6c7086';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(140, 270);
+      ctx.lineTo(400, 160);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#1e1e2e';
+      ctx.fillRect(80, 315, 360, 80);
+      ctx.strokeStyle = '#313244';
+      ctx.strokeRect(80, 315, 360, 80);
+
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = '12px Segoe UI';
+      ctx.fillText('Transformación a Vector Descriptivo 3D:', 95, 335);
+      ctx.fillStyle = '#89b4fa';
+      ctx.font = '12px Consolas';
+      ctx.fillText('dx = 260 px  |  dy = -110 px  (Dist: ~282 px)', 95, 355);
+      ctx.fillStyle = '#f9e2af';
+      ctx.font = 'bold 12.5px Consolas';
+      ctx.fillText('Vector = [ log(282), cos(θ), sin(θ) ]', 95, 378);
+
+      // Espacio KDTree
+      const gx = 520, gy = 80, gw = 320, gh = 280;
+      ctx.fillStyle = '#181825';
+      ctx.fillRect(gx, gy, gw, gh);
+      ctx.strokeStyle = '#f9e2af';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(gx, gy, gw, gh);
+
+      ctx.fillStyle = '#f9e2af';
+      ctx.font = 'bold 12px Segoe UI';
+      ctx.fillText('Espacio de Descriptores (KDTree en Memoria)', gx + 15, gy + 24);
+      ctx.fillStyle = '#a6adc8';
+      ctx.font = '10px Segoe UI';
+      ctx.fillText('Búsqueda por similitud angular y log-distancia', gx + 15, gy + 40);
+
+      const datasetPoints = [
+        { x: 570, y: 150 }, { x: 620, y: 190 }, { x: 740, y: 170 },
+        { x: 590, y: 290 }, { x: 780, y: 280 }, { x: 670, y: 210 },
+        { x: 710, y: 310 }, { x: 760, y: 220 }, { x: 640, y: 250 },
+      ];
+
+      datasetPoints.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#45475a';
+        ctx.fill();
+      });
+
+      const qx = 680, qy = 230;
+      ctx.beginPath();
+      ctx.arc(qx, qy, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#f38ba8';
+      ctx.fill();
+
+      const r = Math.min(65, progress * 80);
+      ctx.beginPath();
+      ctx.arc(qx, qy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(249, 226, 175, 0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      if (r >= 20) {
+        ctx.beginPath();
+        ctx.arc(670, 210, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#a6e3a1';
+        ctx.fill();
+
+        ctx.fillStyle = '#a6e3a1';
+        ctx.font = 'bold 12px Segoe UI';
+        ctx.fillText('★ Trazo #93 Escogido (< 0.1 ms)', 580, 195);
+      }
+    }
+
+    // PASO 3: Transformación Conforme (Llega EXACTO a B)
+    function renderStep3(progress) {
+      ctx.fillStyle = '#f38ba8';
+      ctx.font = 'bold 16px Segoe UI';
+      ctx.fillText('3. Transformación Conforme: La curva rota y escala hasta coincidir EXACTO en B', 35, 38);
+
+      drawTargetPin(targetA.x, targetA.y, 'Inicio A');
+      drawTargetPin(targetB.x, targetB.y, 'Destino B');
+
+      // Trazo original tenue
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(69, 71, 90, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      for (let i = 0; i < baseStroke.length; i++) {
+        const px = targetA.x + (baseStroke[i].x - baseStroke[0].x);
+        const py = targetA.y + (baseStroke[i].y - baseStroke[0].y);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#6c7086';
+      ctx.font = '11px Segoe UI';
+      ctx.fillText('Trazo original sin rotar/escalar', targetA.x + 160, targetA.y - 30);
+
+      const t = Math.min(1.0, progress * 1.3);
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#f38ba8';
+      ctx.lineWidth = 3;
+
+      for (let i = 0; i < baseStroke.length; i++) {
+        const origX = targetA.x + (baseStroke[i].x - baseStroke[0].x);
+        const origY = targetA.y + (baseStroke[i].y - baseStroke[0].y);
+
+        const curX = origX + (transformedStroke[i].x - origX) * t;
+        const curY = origY + (transformedStroke[i].y - origY) * t;
+
+        if (i === 0) ctx.moveTo(curX, curY);
+        else ctx.lineTo(curX, curY);
+      }
+      ctx.stroke();
+
+      // Punto final coincidiendo exactamente en B
+      const endX = (targetA.x + (baseStroke[baseStroke.length-1].x - baseStroke[0].x)) * (1 - t) + targetB.x * t;
+      const endY = (targetA.y + (baseStroke[baseStroke.length-1].y - baseStroke[0].y)) * (1 - t) + targetB.y * t;
+
+      ctx.beginPath();
+      ctx.arc(endX, endY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = t > 0.95 ? '#a6e3a1' : '#f9e2af';
+      ctx.fill();
+
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = '12px Segoe UI';
+      ctx.fillText(`• Origen fijo en A: (${targetA.x}, ${targetA.y})`, 80, 365);
+      ctx.fillStyle = t > 0.95 ? '#a6e3a1' : '#f9e2af';
+      ctx.fillText(`• Destino exacto en B: (${targetB.x}, ${targetB.y}) ✓`, 80, 385);
+    }
+
+    // PASO 4: Spline y Tiempo Híbrido
+    function renderStep4(progress) {
+      ctx.fillStyle = '#cba6f7';
+      ctx.font = 'bold 16px Segoe UI';
+      ctx.fillText('4. Spline y Tiempo Híbrido: 100% Tiempo Humano Puro + Amortiguación Fitts', 35, 38);
+
+      drawTargetPin(targetA.x, targetA.y, 'Inicio A');
+      drawTargetPin(targetB.x, targetB.y, 'Destino B');
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#cba6f7';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < transformedStroke.length; i++) {
+        if (i === 0) ctx.moveTo(transformedStroke[i].x, transformedStroke[i].y);
+        else ctx.lineTo(transformedStroke[i].x, transformedStroke[i].y);
+      }
+      ctx.stroke();
+
+      const totalPts = Math.min(transformedStroke.length, Math.floor(progress * transformedStroke.length * 1.1));
+      for (let i = 0; i < totalPts; i++) {
+        ctx.beginPath();
+        ctx.arc(transformedStroke[i].x, transformedStroke[i].y, 3.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#a6e3a1';
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#1e1e2e';
+      ctx.fillRect(470, 255, 385, 130);
+      ctx.strokeStyle = '#cba6f7';
+      ctx.strokeRect(470, 255, 385, 130);
+
+      ctx.fillStyle = '#f9e2af';
+      ctx.font = 'bold 12px Segoe UI';
+      ctx.fillText('Tiempo Híbrido & Densificación Spline:', 485, 278);
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = '11.5px Segoe UI';
+      ctx.fillText('• Distancia similar (<15%): 100% tiempo grabado real.', 485, 300);
+      ctx.fillText('• Estiramientos grandes: Fitts amortigua suavemente (exp).', 485, 320);
+      ctx.fillText('• Spline continuo: densifica a 60-120 Hz (8-16 ms).', 485, 340);
+      ctx.fillStyle = '#a6e3a1';
+      ctx.fillText('• Cero patrones matemáticos rígidos: antibots eludidos.', 485, 362);
+    }
+
+    // PASO 5: Inyección en Navegador / SO
+    function renderStep5(progress) {
+      ctx.fillStyle = '#a6e3a1';
+      ctx.font = 'bold 16px Segoe UI';
+      ctx.fillText('5. Inyección: Despacho de eventos de ratón reales con isTrusted: true', 35, 38);
+
+      const hit = progress > 0.88;
+      drawTargetPin(targetA.x, targetA.y, 'Inicio (0, 0)');
+      drawTargetPin(targetB.x, targetB.y, 'Botón Objetivo', hit);
+
+      const idx = Math.min(transformedStroke.length - 1, Math.floor(progress * (transformedStroke.length - 1)));
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#a6e3a1';
+      ctx.lineWidth = 3;
+      for (let i = 0; i <= idx; i++) {
+        if (i === 0) ctx.moveTo(transformedStroke[i].x, transformedStroke[i].y);
+        else ctx.lineTo(transformedStroke[i].x, transformedStroke[i].y);
+      }
+      ctx.stroke();
+
+      const cur = transformedStroke[idx];
+      drawCursorIcon(cur.x, cur.y);
+
+      if (hit) {
+        ctx.fillStyle = '#a6e3a1';
+        ctx.font = 'bold 17px Segoe UI';
+        ctx.fillText('✓ ¡CLICK! (dwell time: 82ms) - Cloudflare / DataDome Superados', 200, 95);
+      }
+    }
+
+    function animate(now) {
+      const dt = (now - lastTime) / 1000.0;
+      lastTime = now;
+
+      if (isPlaying) {
+        // Velocidad ajustada para que el paso 1 permita ver bien los 4 clics
+        const speed = (currentStep === 1) ? 0.22 : 0.38;
+        animProgress += dt * speed;
+        if (animProgress >= 1.0) {
+          animProgress = 0.0;
+          currentStep = (currentStep % 5) + 1;
+          updateUI();
+        }
+      }
+
+      ctx.fillStyle = '#11111b';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+
+      switch (currentStep) {
+        case 1: renderStep1(animProgress); break;
+        case 2: renderStep2(animProgress); break;
+        case 3: renderStep3(animProgress); break;
+        case 4: renderStep4(animProgress); break;
+        case 5: renderStep5(animProgress); break;
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function updateUI() {
+      for (let i = 1; i <= 5; i++) {
+        const pill = document.getElementById(`pill-${i}`);
+        pill.className = 'step-pill';
+        if (i === currentStep) pill.classList.add('active');
+        else if (i < currentStep) pill.classList.add('completed');
+      }
+      const info = stepsInfo[currentStep];
+      document.getElementById('infoTitle').textContent = info.title;
+      document.getElementById('infoTitle').style.color = info.color;
+      document.getElementById('infoDesc').textContent = info.desc;
+    }
+
+    function setStep(step) {
+      currentStep = step;
+      animProgress = 0.0;
+      updateUI();
+    }
+
+    function nextStep() {
+      currentStep = (currentStep % 5) + 1;
+      animProgress = 0.0;
+      updateUI();
+    }
+
+    function prevStep() {
+      currentStep = currentStep === 1 ? 5 : currentStep - 1;
+      animProgress = 0.0;
+      updateUI();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById('btnPlay').textContent = isPlaying ? '⏸ Pausar' : '▶ Reproducir';
+    }
+
+    updateUI();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

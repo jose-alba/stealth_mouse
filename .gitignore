@@ -223,6 +223,3 @@ venv/
 ENV/
 env/
 
-# Animation & generator utilities
-animation.html
-generate_gif.py

@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""
+Screen Sense CLI: The agent's visual sensing tool.
+Provides screenshot capture, display resolution, DPI metrics, and cursor tracking.
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+
+# Add possible paths to stealth_mouse_common
+script_dir = Path(__file__).resolve().parent
+search_paths = [
+    script_dir,
+    script_dir / "stealth_mouse_common",
+    script_dir.parent.parent,
+    script_dir.parent.parent / "stealth_mouse_common",
+    Path.home() / ".gemini" / "config" / "skills",
+    Path.home() / ".gemini" / "config" / "skills" / "stealth_mouse_common",
+    Path.home() / ".claude" / "skills",
+    Path.home() / ".claude" / "skills" / "stealth_mouse_common",
+]
+for p in search_paths:
+    if p.exists() and str(p) not in sys.path:
+        sys.path.insert(0, str(p))
+
+try:
+    import stealth_mouse_common as smc
+except ImportError:
+    # If not found directly, try relative parent
+    sys.path.insert(0, str(script_dir.parent.parent))
+    import stealth_mouse_common as smc
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Screen Sense CLI")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Subcommand: info
+    subparsers.add_parser("info", help="Get display dimensions, DPI info, and cursor position")
+
+    # Subcommand: pos
+    subparsers.add_parser("pos", help="Get current cursor coordinates")
+
+    # Subcommand: capture
+    cap_parser = subparsers.add_parser("capture", help="Capture a screenshot")
+    cap_parser.add_argument("--out", type=str, default=None, help="Output image file path (.png)")
+    cap_parser.add_argument(
+        "--region",
+        type=int,
+        nargs=4,
+        metavar=("LEFT", "TOP", "RIGHT", "BOTTOM"),
+        default=None,
+        help="Crop region coordinates",
+    )
+
+    args = parser.parse_args()
+
+    try:
+        if args.command == "info":
+            info = smc.get_display_info()
+            print(json.dumps(info, indent=2))
+
+        elif args.command == "pos":
+            info = smc.get_display_info()
+            pos_data = {
+                "cursor_x": info.get("cursor_x", 0),
+                "cursor_y": info.get("cursor_y", 0),
+                "screen_width": info.get("width", 1920),
+                "screen_height": info.get("height", 1080),
+            }
+            print(json.dumps(pos_data, indent=2))
+
+        elif args.command == "capture":
+            region_tuple = tuple(args.region) if args.region else None
+            result = smc.capture_screen(output_path=args.out, region=region_tuple)
+            print(json.dumps(result, indent=2))
+
+    except Exception as e:
+        err_res = {"status": "error", "message": str(e)}
+        print(json.dumps(err_res, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
